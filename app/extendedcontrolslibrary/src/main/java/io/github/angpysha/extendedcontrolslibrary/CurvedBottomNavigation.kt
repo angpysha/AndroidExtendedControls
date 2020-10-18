@@ -1,6 +1,7 @@
 package io.github.angpysha.extendedcontrolslibrary
 
 import android.animation.*
+import android.content.ContentValues.TAG
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
@@ -8,15 +9,23 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.drawable.Drawable
 import android.util.AttributeSet
+import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import androidx.annotation.IdRes
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.doOnLayout
 import androidx.interpolator.view.animation.FastOutLinearInInterpolator
+import androidx.navigation.NavController
+import androidx.navigation.NavDestination
+import androidx.navigation.NavGraph
+import androidx.navigation.NavOptions
 import androidx.vectordrawable.graphics.drawable.AnimatedVectorDrawableCompat
+import androidx.viewpager.widget.PagerAdapter
+import androidx.viewpager.widget.ViewPager
 import io.github.angpysha.extendedcontrolslibrary.Models.CurvePoint
 import io.github.angpysha.extendedcontrolslibrary.Models.CurvedBarMenuItem
 import java.lang.Exception
@@ -101,7 +110,7 @@ class CurvedBottomNavigation @JvmOverloads constructor(
             menuItem.setOnClickListener {
              //   menuItem.visibility = View.INVISIBLE
                 OnMenuItemClick(index)
-                prevMenuIndex = index
+                //prevMenuIndex = index
             }
 
 
@@ -161,6 +170,7 @@ class CurvedBottomNavigation @JvmOverloads constructor(
 
 //        invalidate()
         animateItemSeletion(offset,width/itemsCount,index)
+        menuItemListener?.invoke(this!!.items!![index],index)
     }
 
     private fun getCurrentItemXCenter(index: Int) : Float {
@@ -175,6 +185,8 @@ class CurvedBottomNavigation @JvmOverloads constructor(
         val yPositionAnimatorHolderShow = PropertyValuesHolder.ofFloat(Y_CENTER,curYCenter,defCentrY)
 
         val diff = abs(prevMenuIndex-index)
+        if (diff==0)
+            return
         val animPerItemDuration = duration/diff
 
         val xCenterPositionHolder = PropertyValuesHolder.ofFloat(X_CENTER,curXCenter,newXCenter)
@@ -275,11 +287,16 @@ class CurvedBottomNavigation @JvmOverloads constructor(
             addListener(object: AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator?) {
                     super.onAnimationEnd(animation)
-
+                    menuItemsViews?.forEach {
+                        it.resetAnimation()
+                    }
                 }
 
                 override fun onAnimationCancel(animation: Animator?) {
                     super.onAnimationCancel(animation)
+                    menuItemsViews?.forEach {
+                        it.resetAnimation()
+                    }
                 }
             })
 
@@ -287,24 +304,65 @@ class CurvedBottomNavigation @JvmOverloads constructor(
                 val newOffset = getAnimatedValue(X_OFFSET)
                 xOffset = newOffset as Float
                 calculatePath(index)
-
+                invalidate()
                 val newXcenter = getAnimatedValue(X_CENTER)
                 curXCenter = newXcenter as Float
 
-                invalidate()
+
 
                 //hide and show menuitemanimation
                 val currentTime = it.animatedFraction * animduration
-                val curveBottomHalfTime = animduration * fabSize/width
-                val currentIndex = ((currentTime+animperItemDuration)/animperItemDuration).toInt()
+                val itemWidth = width/itemsCount
+                val fabradius = (fabSize/2)*1.5
+                val centerX = itemWidth/2
+                val lineToFab = centerX-fabradius
+
+           //     val length = lineToFab+2*fabradius+lineToFab
+                val length = 2*fabradius
+
+                val curveBottomHalfTime = ((length*animperItemDuration)/itemWidth).toLong()
+                var overcomeIndex = ((currentTime+animperItemDuration)/animperItemDuration).toInt()
+
+//                if (overcomeIndex >= abs(selectedIndex-prevMenuIndex))
+//                    return@addUpdateListener
+
+                if (prevMenuIndex < selectedIndex) {
+                    overcomeIndex+=prevMenuIndex
+                    if (overcomeIndex>index)
+                        return@addUpdateListener
+                } else {
+                    overcomeIndex = prevMenuIndex - overcomeIndex
+                    if (overcomeIndex < index)
+                        return@addUpdateListener
+                }
+              //  overcomeIndex = prevMenuIndex - overcomeIndex
+                val sel = selectedIndex
+             //   val iii = 0
+
 
                 when {
-                    currentIndex == index -> {
+                    overcomeIndex == index -> {
+                        menuItemsViews[overcomeIndex].startHideAnimation((curveBottomHalfTime).toLong())
+                        if (abs(prevMenuIndex-index) == 1) {
+                            menuItemsViews[prevMenuIndex].startShowAnimation((animperItemDuration).toLong())
+                        }
 
                     }
 
+                    abs(overcomeIndex-prevMenuIndex) == 1 -> {
+                        menuItemsViews[prevMenuIndex].startShowAnimation((animperItemDuration).toLong())
+                        menuItemsViews[overcomeIndex].startIntermediateAnimation((1.5*animperItemDuration).toLong(),(curveBottomHalfTime).toLong())
+                      //  menuItemsViews[overcomeIndex].visibility = View.INVISIBLE
+
+                        // menuItemsViews[overcomeIndex].startIntermediateAnimation(animperItemDuration,curveBottomHalfTime)
+                    }
+
                     else -> {
-                        
+                    //    val iii =0
+                        menuItemsViews[overcomeIndex].startIntermediateAnimation((1.5*animperItemDuration).toLong(),
+                            (curveBottomHalfTime).toLong()
+                        )
+                     //  menuItemsViews[overcomeIndex].visibility = View.INVISIBLE
                     }
                 }
 
@@ -339,12 +397,12 @@ class CurvedBottomNavigation @JvmOverloads constructor(
         val xLineLength = curXCenter- fabradius - xOffset
         val itemCurveBeign = xLineLength-xOffset
 
-        curveOnePointOne = CurvePoint((curXCenter- fabradius*0.8).toFloat(),0+yOffset)
-        curveOnePointTwo = CurvePoint((curXCenter - fabradius*0.7).toFloat(),
+        curveOnePointOne = CurvePoint((curXCenter- fabradius*0.7).toFloat(),0+yOffset)
+        curveOnePointTwo = CurvePoint((curXCenter - fabradius*0.8).toFloat(),
             (0.9*height).toFloat())
         curveOnePointTo = CurvePoint(curXCenter, (0.9*height).toFloat())
-        curveTwoPointOne = CurvePoint((curXCenter+ fabradius*0.7).toFloat(),(0.9*height).toFloat())
-        curveTwoPointTwo = CurvePoint((curXCenter + fabradius*0.8).toFloat(),0f+yOffset)
+        curveTwoPointOne = CurvePoint((curXCenter+ fabradius*0.8).toFloat(),(0.9*height).toFloat())
+        curveTwoPointTwo = CurvePoint((curXCenter + fabradius*0.7).toFloat(),0f+yOffset)
         curveTwoPointTo = CurvePoint((curXCenter+fabradius).toFloat(),0f+yOffset)
 
       //  val xLineLength = curXCenter- fabradius - xOffset
@@ -369,6 +427,127 @@ class CurvedBottomNavigation @JvmOverloads constructor(
 
         return path
     }
+
+    private var menuItemListener : ((CurvedBarMenuItem,Int) -> Unit)? = null
+    fun setOnMenuItemClickListener(listener: (CurvedBarMenuItem,Int) -> Unit) {
+        this.menuItemListener = listener
+    }
+
+    // function to setup with navigation controller just like in BottomNavigationView
+    fun setupWithNavController(navController: NavController) {
+        // check for menu initialization
+//        if (!isMenuInitialized) {
+//            throw RuntimeException("initialize menu by calling setMenuItems() before setting up with NavController")
+//        }
+
+        this.navController = navController
+        // the start destination and active index
+        if (navController.graph.startDestination != items?.get(selectedIndex)?.destionantion?:0) {
+            throw RuntimeException("startDestination in graph doesn't match the activeIndex set in setMenuItems()")
+        }
+
+        // initialize the menu
+        setOnMenuItemClickListener { item, _ ->
+            navigateToDestination(navController, item)
+        }
+        // setup destination change listener to properly sync the back button press
+        navController.addOnDestinationChangedListener { _, destination, _ ->
+            for (i in items?.indices!!) {
+                if (matchDestination(destination, items!![i].destionantion)) {
+               //     OnMenuItemClick(i)
+                }
+            }
+        }
+    }
+
+    private lateinit var navController: NavController
+    // source code referenced from the actual JetPack Navigation Component
+    // refer to the original source code
+    private fun navigateToDestination(navController: NavController, itemCbn: CurvedBarMenuItem) {
+        if (itemCbn.destionantion == -1) {
+            throw RuntimeException("please set a valid id, unable the navigation!")
+        }
+        val builder = NavOptions.Builder()
+            .setLaunchSingleTop(true)
+            .setEnterAnim(R.anim.nav_default_enter_anim)
+            .setExitAnim(R.anim.nav_default_exit_anim)
+            .setPopEnterAnim(R.anim.nav_default_pop_enter_anim)
+            .setPopExitAnim(R.anim.nav_default_pop_exit_anim)
+
+
+      //  val res = androidx.navigation.R.
+        // pop to the navigation graph's start  destination
+        builder.setPopUpTo(findStartDestination(navController.graph).id, false)
+        val options = builder.build()
+        try {
+            navController.navigate(itemCbn.destionantion, null, options)
+        } catch (e: IllegalArgumentException) {
+            Log.w(TAG, "unable to navigate!", e)
+        }
+    }
+
+    // source code referenced from the actual JetPack Navigation Component
+    // refer to the original source code
+    private fun matchDestination(destination: NavDestination, @IdRes destinationId: Int): Boolean {
+        var currentDestination = destination
+        while (currentDestination.id != destinationId && currentDestination.parent != null) {
+            currentDestination = currentDestination.parent!!
+        }
+
+        return currentDestination.id == destinationId
+    }
+
+    // source code referenced from the actual JetPack Navigation Component
+    // refer to the original source code
+    private fun findStartDestination(graph: NavGraph): NavDestination {
+        var startDestination: NavDestination = graph
+        while (startDestination is NavGraph) {
+            startDestination = graph.findNode(graph.startDestination)!!
+        }
+
+        return startDestination
+    }
+
+    fun OnBackPressed() : Boolean {
+        val currentNavDestination = navController.currentDestination?.id?:-1
+        if (currentNavDestination != -1) {
+           val cont =  items?.any { it.destionantion == currentNavDestination } ?: false
+
+            return !cont
+        }
+
+        return true
+    }
+
+    private var viewPager: ViewPager? = null
+
+    fun setupWithViewPager(viewPager: ViewPager) {
+        this.viewPager = viewPager
+
+        setOnMenuItemClickListener { curvedBarMenuItem, i ->
+            viewPager.currentItem = i
+        }
+
+        viewPager.addOnPageChangeListener(object :
+            ViewPager.OnPageChangeListener {
+            override fun onPageScrollStateChanged(state: Int) {
+
+            }
+
+            override fun onPageScrolled(
+                position: Int,
+                positionOffset: Float,
+                positionOffsetPixels: Int
+            ) {
+
+            }
+
+            override fun onPageSelected(position: Int) {
+
+            }
+        })
+    }
+
     override fun onDraw(canvas: Canvas?) {
         super.onDraw(canvas)
 
@@ -394,19 +573,23 @@ class CurvedBottomNavigation @JvmOverloads constructor(
 
         val papp = calculatePath(selectedIndex)
         canvas?.drawCircle(curXCenter,curYCenter, (fabSize/2).toFloat(),circlePaint)
-//
-//        if (vectorDrawables?.get(selectedIndex) != null) {
-//            try {
-//                vectorDrawables[selectedIndex]?.setBounds((baseWidth+xOffset+baseWidth - (0.4*height/2).toFloat()).toInt(),(curYCenter-(0.4*height/2).toFloat()).toInt(),
-//                    (baseWidth+xOffset+baseWidth + (0.4*height/2).toFloat()).toInt(),(curYCenter+(0.4*height/2).toFloat()).toInt())
-//                vectorDrawables[selectedIndex]?.draw(canvas!!)
-//            } catch (ex: Exception) {
-//                val drawable = ResourcesCompat.getDrawable(resources, this.items!![selectedIndex].iconImageSource,context.theme)
-//                drawable?.setBounds((baseWidth+xOffset+baseWidth - (0.4*height/2).toFloat()).toInt(),(curYCenter-(0.4*height/2).toFloat()).toInt(),
-//                    (baseWidth+xOffset+baseWidth + (0.4*height/2).toFloat()).toInt(),(curYCenter+(0.4*height/2).toFloat()).toInt())
-//                drawable?.draw(canvas!!)
-//            }
-//        }
+
+        if (vectorDrawables?.get(selectedIndex) != null) {
+            try {
+                vectorDrawables[selectedIndex]?.setBounds((curXCenter - (fabSize/3).toFloat()).toInt(),
+                    (curYCenter-(fabSize/3).toFloat()).toInt(),
+                    (curXCenter +(fabSize/3).toFloat()).toInt(),
+                    (curYCenter+(fabSize/3).toFloat()).toInt())
+                vectorDrawables[selectedIndex]?.draw(canvas!!)
+            } catch (ex: Exception) {
+                val drawable = ResourcesCompat.getDrawable(resources, this.items!![selectedIndex].iconImageSource,context.theme)
+                drawable?.setBounds((curXCenter - (fabSize/3).toFloat()).toInt(),
+                    (curYCenter-(fabSize/3).toFloat()).toInt(),
+                    (curXCenter + (fabSize/3).toFloat()).toInt(),
+                    (curYCenter+(fabSize/3).toFloat()).toInt())
+                drawable?.draw(canvas!!)
+            }
+        }
 
 
 

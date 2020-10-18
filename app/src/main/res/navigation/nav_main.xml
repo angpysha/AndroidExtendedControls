@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_main"
+    app:startDestination="@id/firstFragment">
+
+    <fragment
+        android:id="@+id/firstFragment"
+        android:name="io.github.angpysha.extendedcontrols.FirstFragment"
+        android:label="fragment_first"
+        tools:layout="@layout/fragment_first" />
+    <fragment
+        android:id="@+id/itemFragment"
+        android:name="io.github.angpysha.extendedcontrols.ItemFragment"
+        android:label="fragment_item_list"
+        tools:layout="@layout/fragment_item_list" />
+    <fragment
+        android:id="@+id/fourthFragment"
+        android:name="io.github.angpysha.extendedcontrols.FourthFragment"
+        android:label="fragment_fourth"
+        tools:layout="@layout/fragment_fourth" />
+    <fragment
+        android:id="@+id/thirdFragment"
+        android:name="io.github.angpysha.extendedcontrols.ThirdFragment"
+        android:label="third_fragment"
+        tools:layout="@layout/third_fragment" />
+    <fragment
+        android:id="@+id/messagesFragment"
+        android:name="io.github.angpysha.extendedcontrols.MessagesFragment"
+        android:label="fragment_messages_list"
+        tools:layout="@layout/fragment_messages_list" />
+</navigation>
