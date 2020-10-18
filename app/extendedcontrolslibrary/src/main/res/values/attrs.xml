@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="ExtendedTextView">
+        <attr name="isNumeric" format="boolean"/>
+    </declare-styleable>
+    
+    <declare-styleable name="CurvedBottomNavigation">
+        <attr name="bne_hastitles" format="boolean"/>
+    </declare-styleable>
+</resources>

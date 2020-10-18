@@ -1,0 +1,3 @@
+rootProject.name='ExtendedControls.Demo'
+include ':app'
+include ':app:extendedcontrolslibrary'

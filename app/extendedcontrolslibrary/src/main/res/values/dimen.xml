@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="curved_tabbar_height">65dp</dimen>
+    <dimen name="curved_tabbar_item_height">44dp</dimen>
+    <dimen name="curved_fab_size">44dp</dimen>
+</resources>
